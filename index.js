@@ -17,11 +17,7 @@ cloudinary.config({
 const storage = multer.memoryStorage(); // Use memory storage to upload to Cloudinary
 const upload = multer({ storage: storage });
 
-// Create an upload directory if it doesn't exist
-const uploadDir = './uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
+
 
 // Root Route: Simple Upload Form (for testing)
 app.get('/', (req, res) => {
