@@ -1,60 +1,74 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const cloudinary = require('cloudinary').v2; // Cloudinary SDK
+const fs = require('fs');
 const app = express();
 const port = 3000;
 
-// Set up the storage configuration for multer
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/');  // Define the upload folder
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname));  // Unique file name
-    }
+// Cloudinary configuration (replace with your own credentials)
+cloudinary.config({
+  cloud_name: 'dja2p5cto', // Your Cloudinary cloud name
+  api_key: '365484131315443',       // Your Cloudinary API key
+  api_secret: 'QGhjG2DHdoReD1SDLfeZ-hDMC2w'  // Your Cloudinary API secret
 });
 
-//const upload = multer({ storage: storage });
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // Maximum file size: 2MB
-    fileFilter: (req, file, cb) => {
-        const fileTypes = /jpeg|jpg|png|gif/;
-        const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = fileTypes.test(file.mimetype);
-
-        if (extname && mimetype) {
-            return cb(null, true);
-        } else {
-            cb(new Error('Invalid file type. Only JPEG, PNG, and GIF are allowed.'));
-        }
-    }
-});
-
+// Set up multer storage configuration
+const storage = multer.memoryStorage(); // Use memory storage to upload to Cloudinary
+const upload = multer({ storage: storage });
 
 // Create an upload directory if it doesn't exist
-const fs = require('fs');
 const uploadDir = './uploads';
 if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir);
 }
 
-// Route to handle image upload via Postman (POST request)
-app.post('/upload', upload.single('image'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).send('No file uploaded.');
-    }
-    res.json({
-        message: 'Upload successful!',
-        file: req.file
-    });
+// Root Route: Simple Upload Form (for testing)
+app.get('/', (req, res) => {
+  res.send(`
+    <h2>Upload an Image</h2>
+    <form action="/cloudpost" method="POST" enctype="multipart/form-data">
+        <input type="file" name="profile_image" required />
+        <button type="submit">Upload</button>
+    </form>
+  `);
 });
 
-// Serve the uploaded images (optional, for testing)
-app.use('/uploads', express.static('uploads'));
+// Cloudinary Upload Route
+app.post('/cloudpost', upload.single('profile_image'), async (req, res) => {
+  try {
+    // Check if image is provided
+    if (!req.file) {
+      return res.status(400).json({ error: "Profile image is required" });
+    }
+
+    // Upload to Cloudinary using the image buffer
+    const uploadResult = await cloudinary.uploader.upload(
+      `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+      {
+        folder: "profiles", // Folder in Cloudinary to store the image
+      }
+    );
+
+    const imageUrl = uploadResult.secure_url; // The URL of the uploaded image
+
+    // Send a successful response with the image URL
+    res.status(201).json({
+      success: true,
+      message: "✅ Image uploaded to Cloudinary",
+      image_url: imageUrl,
+    });
+
+  } catch (err) {
+    console.error("Server error:", err);
+    res.status(500).json({
+      error: "Server error",
+      message: err.message,
+    });
+  }
+});
 
 // Start the server
 app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
+  console.log(`Server is running at http://localhost:${port}`);
 });
-
